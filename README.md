@@ -88,11 +88,11 @@ Contributions are welcome! Here's how you can help:
 4. Push to the branch: `git push origin my-new-feature`
 5. Submit a pull request
 
-Please read the [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and pull request process.
+
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgements
 
