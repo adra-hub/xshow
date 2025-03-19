@@ -34,7 +34,7 @@ XShow is a lightweight file management system designed to help you organize and 
 1. **Download the latest release** from the [releases page](https://github.com/adra-hub/xshow/releases)
 2. **Extract the files** to your web server directory
 3. **Navigate** to the xshow directory in your web browser
-4. **Follow** the installation wizard to set up your admin account
+4. **Follow** the installation wizard to set up your admin account; - ***First User must be named "admin"***
 5. **Start exploring** your new file management system!
 
 ### Manual Installation
