@@ -153,11 +153,21 @@ function scanDirectory($path) {
         $files = scandir($realPath);
         $result = [];
         
+        // Get the xshow directory path to exclude it
+        $xshowPath = realpath(__DIR__);
+        $xshowDirName = basename($xshowPath);
+        
         foreach ($files as $file) {
             if ($file === '.' || $file === '..') continue;
             
             $fullPath = $realPath . DIRECTORY_SEPARATOR . $file;
             if (!is_readable($fullPath)) continue;
+            
+            // Skip the xshow directory
+            if (realpath($fullPath) === $xshowPath || $file === $xshowDirName) {
+                debugLog('Skipping xshow directory', $fullPath);
+                continue;
+            }
             
             $isDir = is_dir($fullPath);
             $relativePath = getRelativePath($fullPath);
