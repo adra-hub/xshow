@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XShow Login</title>
+    <link rel="stylesheet" href="/xshow/assets/css/style.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <img src="/xshow/assets/img/xshow-logo-site.png" class="img-fluid-logo" alt="XShow Logo">
+            <h1>Organize. Create. Control.</h1>
+            <p>Please login to continue</p>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <div id="error-message" class="error-message" style="display: none;"></div>
+                
+                <button type="submit" class="button">Login</button>
+            </form>
+            <p class="text-min">Crafted with 🫀 by ADIRA Studio</p>
+        </div>
+    </div>
+
+    <script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const errorMessage = document.getElementById('error-message');
+        const submitButton = this.querySelector('button[type="submit"]');
+        
+        try {
+            submitButton.disabled = true;
+            submitButton.classList.add('loading');
+            
+            const formData = new FormData(this);
+            const response = await fetch('', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                window.location.reload();
+            } else {
+                errorMessage.textContent = result.message || 'Invalid credentials';
+                errorMessage.style.display = 'block';
+                submitButton.disabled = false;
+                submitButton.classList.remove('loading');
+            }
+        } catch (error) {
+            errorMessage.textContent = 'An error occurred. Please try again.';
+            errorMessage.style.display = 'block';
+            submitButton.disabled = false;
+            submitButton.classList.remove('loading');
+        }
+    });
+    </script>
+</body>
+</html>
