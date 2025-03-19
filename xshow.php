@@ -1,7 +1,7 @@
 <?php
 session_start();
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+error_reporting(0);
+ini_set('display_errors', 0);
 
 require_once __DIR__ . '/config.php';
 
@@ -12,8 +12,6 @@ if (!Config::isInstalled()) {
 }
 
 define('ROOT_PATH', $_SERVER['DOCUMENT_ROOT']);
-
-
 
 // Initialize plugin handlers array
 $pluginHandlers = [];
@@ -66,12 +64,6 @@ function getRelativePath($fullPath) {
     // Remove any potential duplicate paths
     $relativePath = preg_replace('#^(srv/disk\d+/\d+/www/[^/]+/)(.*)$#', '$2', $relativePath);
     $relativePath = preg_replace('#/+#', '/', $relativePath);
-    
-    debugLog('Relative path calculation', [
-        'full_path' => $fullPath,
-        'root_path' => $rootPath,
-        'relative_path' => $relativePath
-    ]);
     
     return $relativePath;
 }
@@ -129,11 +121,8 @@ function isPathSafe($path) {
 
 function scanDirectory($path) {
     try {
-        debugLog('Scanning directory', $path);
-        
         $realPath = sanitizePath($path);
         if (!is_readable($realPath)) {
-            debugLog('Directory not readable', $realPath);
             return [
                 'status' => 'error',
                 'message' => 'Directory is not readable'
@@ -155,7 +144,6 @@ function scanDirectory($path) {
             
             // Skip the xshow directory
             if (realpath($fullPath) === $xshowPath || $file === $xshowDirName) {
-                debugLog('Skipping xshow directory', $fullPath);
                 continue;
             }
             
@@ -180,7 +168,6 @@ function scanDirectory($path) {
                 'protected' => $isProtected
             ];
             
-            debugLog('Adding file', $fileInfo);
             $result[] = $fileInfo;
         }
 
@@ -191,17 +178,16 @@ function scanDirectory($path) {
             'current_path' => $currentPath
         ];
         
-        debugLog('Scan complete', ['path' => $currentPath, 'file_count' => count($result)]);
         return $response;
         
     } catch (Exception $e) {
-        debugLog('Scan error', $e->getMessage());
         return [
             'status' => 'error',
             'message' => $e->getMessage()
         ];
     }
 }
+
 // Handle AJAX requests
 if (isset($_GET['action'])) {
     header('Content-Type: application/json');
@@ -215,13 +201,11 @@ if (isset($_GET['action'])) {
     try {
         switch ($_GET['action']) {
             case 'scan':
-                debugLog('Scan request', $_GET);
                 $path = isset($_GET['path']) ? $_GET['path'] : '';
                 echo json_encode(scanDirectory($path));
                 break;
 
             case 'create_folder':
-                debugLog('Create folder request', $_POST);
                 if (!isset($_POST['path']) || !isset($_POST['name'])) {
                     echo json_encode([
                         'status' => 'error',
@@ -239,14 +223,6 @@ if (isset($_GET['action'])) {
                 $fullPath = createFullPath($path, $name);
                 
                 try {
-                    debugLog('Creating folder', [
-                        'path' => $path,
-                        'name' => $name,
-                        'full_path' => $fullPath,
-                        'create_index' => $createIndex,
-                        'redirect_url' => $redirectUrl
-                    ]);
-                    
                     // Create parent directories if they don't exist
                     $parentDir = dirname($fullPath);
                     if (!file_exists($parentDir)) {
@@ -293,7 +269,6 @@ if (isset($_GET['action'])) {
                     echo json_encode(['status' => 'success']);
                     
                 } catch (Exception $e) {
-                    debugLog('Create folder error', $e->getMessage());
                     echo json_encode([
                         'status' => 'error',
                         'message' => $e->getMessage()
@@ -302,7 +277,6 @@ if (isset($_GET['action'])) {
                 break;
 
             case 'create_file':
-                debugLog('Create file request', $_POST);
                 if (!isset($_POST['path']) || !isset($_POST['name'])) {
                     echo json_encode([
                         'status' => 'error',
@@ -317,11 +291,6 @@ if (isset($_GET['action'])) {
                 
                 try {
                     $fullPath = createFullPath($path, $name);
-                    debugLog('Creating file', [
-                        'path' => $path,
-                        'name' => $name,
-                        'full_path' => $fullPath
-                    ]);
                     
                     $parentDir = dirname($fullPath);
                     if (!file_exists($parentDir)) {
@@ -345,7 +314,6 @@ if (isset($_GET['action'])) {
                         throw new Exception('Failed to create file');
                     }
                 } catch (Exception $e) {
-                    debugLog('Create file error', $e->getMessage());
                     echo json_encode([
                         'status' => 'error',
                         'message' => $e->getMessage()
@@ -354,7 +322,6 @@ if (isset($_GET['action'])) {
                 break;
 
             case 'delete':
-                debugLog('Delete request', $_POST);
                 if (empty($_POST['path'])) {
                     echo json_encode([
                         'status' => 'error',
@@ -391,7 +358,6 @@ if (isset($_GET['action'])) {
                     
                     echo json_encode(['status' => 'success']);
                 } catch (Exception $e) {
-                    debugLog('Delete error', $e->getMessage());
                     echo json_encode([
                         'status' => 'error',
                         'message' => $e->getMessage()
@@ -400,7 +366,6 @@ if (isset($_GET['action'])) {
                 break;
 
             case 'rename':
-                debugLog('Rename request', $_POST);
                 if (!isset($_POST['oldPath']) || !isset($_POST['newName'])) {
                     echo json_encode([
                         'status' => 'error',
@@ -432,7 +397,6 @@ if (isset($_GET['action'])) {
                         throw new Exception('Failed to rename');
                     }
                 } catch (Exception $e) {
-                    debugLog('Rename error', $e->getMessage());
                     echo json_encode([
                         'status' => 'error',
                         'message' => $e->getMessage()
@@ -440,340 +404,320 @@ if (isset($_GET['action'])) {
                 }
                 break;
 
-                case 'upload':
-                    debugLog('Upload request', $_FILES);
-                    if (!isset($_FILES['files']) || !isset($_POST['path'])) {
+            case 'upload':
+                if (!isset($_FILES['files']) || !isset($_POST['path'])) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'No files uploaded or path not specified'
+                    ]);
+                    break;
+                }
+                
+                $path = $_POST['path'];
+                $uploadDir = sanitizePath($path);
+                
+                // Ensure upload directory exists and is writable
+                if (!file_exists($uploadDir)) {
+                    if (!mkdir($uploadDir, 0755, true)) {
                         echo json_encode([
                             'status' => 'error',
-                            'message' => 'No files uploaded or path not specified'
+                            'message' => 'Failed to create upload directory'
                         ]);
                         break;
                     }
+                }
+                
+                if (!is_writable($uploadDir)) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Upload directory is not writable'
+                    ]);
+                    break;
+                }
+                
+                $files = $_FILES['files'];
+                $successful = [];
+                $failed = [];
+                
+                // Handle multiple file uploads
+                for ($i = 0; $i < count($files['name']); $i++) {
+                    $fileName = $files['name'][$i];
+                    $tmpPath = $files['tmp_name'][$i];
+                    $error = $files['error'][$i];
                     
-                    $path = $_POST['path'];
-                    $uploadDir = sanitizePath($path);
-                    
-                    // Ensure upload directory exists and is writable
-                    if (!file_exists($uploadDir)) {
-                        if (!mkdir($uploadDir, 0755, true)) {
-                            echo json_encode([
-                                'status' => 'error',
-                                'message' => 'Failed to create upload directory'
-                            ]);
-                            break;
-                        }
-                    }
-                    
-                    if (!is_writable($uploadDir)) {
-                        echo json_encode([
-                            'status' => 'error',
-                            'message' => 'Upload directory is not writable'
-                        ]);
-                        break;
-                    }
-                    
-                    $files = $_FILES['files'];
-                    $successful = [];
-                    $failed = [];
-                    
-                    // Handle multiple file uploads
-                    for ($i = 0; $i < count($files['name']); $i++) {
-                        $fileName = $files['name'][$i];
-                        $tmpPath = $files['tmp_name'][$i];
-                        $error = $files['error'][$i];
+                    if ($error === UPLOAD_ERR_OK) {
+                        $destPath = $uploadDir . '/' . $fileName;
                         
-                        if ($error === UPLOAD_ERR_OK) {
-                            $destPath = $uploadDir . '/' . $fileName;
-                            
-                            // Check if file already exists
-                            if (file_exists($destPath) && !isset($_POST['overwrite'])) {
-                                $failed[] = $fileName . ' (already exists)';
-                                continue;
-                            }
-                            
-                            // Move the uploaded file
-                            if (move_uploaded_file($tmpPath, $destPath)) {
-                                chmod($destPath, 0644);
-                                $successful[] = $fileName;
-                            } else {
-                                $failed[] = $fileName . ' (move failed)';
-                            }
+                        // Check if file already exists
+                        if (file_exists($destPath) && !isset($_POST['overwrite'])) {
+                            $failed[] = $fileName . ' (already exists)';
+                            continue;
+                        }
+                        
+                        // Move the uploaded file
+                        if (move_uploaded_file($tmpPath, $destPath)) {
+                            chmod($destPath, 0644);
+                            $successful[] = $fileName;
                         } else {
-                            $errorMessage = match ($error) {
-                                UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
-                                UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE in form',
-                                UPLOAD_ERR_PARTIAL => 'File only partially uploaded',
-                                UPLOAD_ERR_NO_FILE => 'No file was uploaded',
-                                UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
-                                UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
-                                UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the upload',
-                                default => 'Unknown upload error'
-                            };
-                            $failed[] = $fileName . ' (' . $errorMessage . ')';
+                            $failed[] = $fileName . ' (move failed)';
                         }
-                    }
-                    
-                    if (empty($failed)) {
-                        echo json_encode([
-                            'status' => 'success',
-                            'uploaded' => $successful
-                        ]);
-                    } else if (!empty($successful)) {
-                        echo json_encode([
-                            'status' => 'partial',
-                            'uploaded' => $successful,
-                            'failed' => $failed
-                        ]);
                     } else {
-                        echo json_encode([
-                            'status' => 'error',
-                            'message' => 'All uploads failed',
-                            'failed' => $failed
-                        ]);
+                        $errorMessage = match ($error) {
+                            UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
+                            UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE in form',
+                            UPLOAD_ERR_PARTIAL => 'File only partially uploaded',
+                            UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+                            UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
+                            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+                            UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the upload',
+                            default => 'Unknown upload error'
+                        };
+                        $failed[] = $fileName . ' (' . $errorMessage . ')';
                     }
-                    break;
+                }
+                
+                if (empty($failed)) {
+                    echo json_encode([
+                        'status' => 'success',
+                        'uploaded' => $successful
+                    ]);
+                } else if (!empty($successful)) {
+                    echo json_encode([
+                        'status' => 'partial',
+                        'uploaded' => $successful,
+                        'failed' => $failed
+                    ]);
+                } else {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'All uploads failed',
+                        'failed' => $failed
+                    ]);
+                }
+                break;
 
-                case 'save_markdown':
-                    if (!isset($_POST['path']) || !isset($_POST['content'])) {
-                        echo json_encode([
-                            'status' => 'error',
-                            'message' => 'Missing required parameters'
-                        ]);
-                        break;
-                    }
-                    
-                    try {
-                        $path = sanitizePath($_POST['path']);
-                        $content = $_POST['content'];
-                        $newName = isset($_POST['newName']) ? $_POST['newName'] : basename($path);
-                        
-                        // If the file name is being changed
-                        if (basename($path) !== $newName) {
-                            $newPath = dirname($path) . '/' . $newName;
-                            
-                            // Check if the new file would already exist
-                            if (file_exists($newPath)) {
-                                throw new Exception('A file with this name already exists');
-                            }
-                            
-                            // Rename the file
-                            if (!rename($path, $newPath)) {
-                                throw new Exception('Failed to rename file');
-                            }
-                            
-                            $path = $newPath;
-                        }
-                        
-                        // Save the content
-                        if (file_put_contents($path, $content) === false) {
-                            throw new Exception('Failed to save file content');
-                        }
-                        
-                        echo json_encode([
-                            'status' => 'success',
-                            'newPath' => getRelativePath($path)
-                        ]);
-                        
-                    } catch (Exception $e) {
-                        debugLog('Save markdown error', $e->getMessage());
-                        echo json_encode([
-                            'status' => 'error',
-                            'message' => $e->getMessage()
-                        ]);
-                    }
+            case 'save_markdown':
+                if (!isset($_POST['path']) || !isset($_POST['content'])) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Missing required parameters'
+                    ]);
                     break;
+                }
+                
+                try {
+                    $path = sanitizePath($_POST['path']);
+                    $content = $_POST['content'];
+                    $newName = isset($_POST['newName']) ? $_POST['newName'] : basename($path);
+                    
+                    // If the file name is being changed
+                    if (basename($path) !== $newName) {
+                        $newPath = dirname($path) . '/' . $newName;
+                        
+                        // Check if the new file would already exist
+                        if (file_exists($newPath)) {
+                            throw new Exception('A file with this name already exists');
+                        }
+                        
+                        // Rename the file
+                        if (!rename($path, $newPath)) {
+                            throw new Exception('Failed to rename file');
+                        }
+                        
+                        $path = $newPath;
+                    }
+                    
+                    // Save the content
+                    if (file_put_contents($path, $content) === false) {
+                        throw new Exception('Failed to save file content');
+                    }
+                    
+                    echo json_encode([
+                        'status' => 'success',
+                        'newPath' => getRelativePath($path)
+                    ]);
+                    
+                } catch (Exception $e) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => $e->getMessage()
+                    ]);
+                }
+                break;
 
-                    case 'get_users':
-                        // Check if current user is admin
-                        if (!isset($_SESSION['username']) || $_SESSION['username'] !== 'admin') {
-                            echo json_encode([
-                                'status' => 'error',
-                                'message' => 'Access denied. Only admin can perform this action.'
-                            ]);
-                            break;
-                        }
-                        
-                        try {
-                            $users = Config::getUsers();
-                            $userList = [];
-                            foreach ($users as $username => $hash) {
-                                $userList[] = ['username' => $username];
-                            }
-                            echo json_encode([
-                                'status' => 'success',
-                                'users' => $userList
-                            ]);
-                        } catch (Exception $e) {
-                            echo json_encode([
-                                'status' => 'error',
-                                'message' => $e->getMessage()
-                            ]);
-                        }
-                        break;
-                    
-                        case 'add_user':
-                            // Check if current user is admin
-                            if (!isset($_SESSION['username']) || $_SESSION['username'] !== 'admin') {
-                                echo json_encode([
-                                    'status' => 'error',
-                                    'message' => 'Access denied. Only admin can perform this action.'
-                                ]);
-                                break;
-                            }
-                            
-                            if (!isset($_POST['username']) || !isset($_POST['password'])) {
-                                echo json_encode([
-                                    'status' => 'error',
-                                    'message' => 'Missing required parameters'
-                                ]);
-                                break;
-                            }
-                        
-                            // Enhanced password validation
-                            $password = $_POST['password'];
-                            $errors = [];
-                            
-                            // Check length
-                            if (strlen($password) < 8) {
-                                $errors[] = 'Password must be at least 8 characters long';
-                            }
-                            
-                            // Check for uppercase letters
-                            if (!preg_match('/[A-Z]/', $password)) {
-                                $errors[] = 'Password must contain at least one uppercase letter';
-                            }
-                            
-                            // Check for lowercase letters
-                            if (!preg_match('/[a-z]/', $password)) {
-                                $errors[] = 'Password must contain at least one lowercase letter';
-                            }
-                            
-                            // Check for numbers
-                            if (!preg_match('/[0-9]/', $password)) {
-                                $errors[] = 'Password must contain at least one number';
-                            }
-                            
-                            // Check for special characters
-                            if (!preg_match('/[^A-Za-z0-9]/', $password)) {
-                                $errors[] = 'Password must contain at least one special character';
-                            }
-                            
-                            // If there are errors, return them
-                            if (!empty($errors)) {
-                                echo json_encode([
-                                    'status' => 'error',
-                                    'message' => implode('. ', $errors)
-                                ]);
-                                break;
-                            }
-                        
-                            try {
-                                Config::addUser($_POST['username'], $password);
-                                echo json_encode(['status' => 'success']);
-                            } catch (Exception $e) {
-                                echo json_encode([
-                                    'status' => 'error',
-                                    'message' => $e->getMessage()
-                                ]);
-                            }
-                            break;
-                    
-                            case 'change_password':
-                                // Admin can change any password, other users can only change their own
-                                if (!isset($_SESSION['username']) || 
-                                    ($_SESSION['username'] !== 'admin' && $_SESSION['username'] !== $_POST['username'])) {
-                                    echo json_encode([
-                                        'status' => 'error',
-                                        'message' => 'Access denied. You can only change your own password.'
-                                    ]);
-                                    break;
-                                }
-                                
-                                if (!isset($_POST['username']) || !isset($_POST['password'])) {
-                                    echo json_encode([
-                                        'status' => 'error',
-                                        'message' => 'Missing required parameters'
-                                    ]);
-                                    break;
-                                }
-                            
-                                // Enhanced password validation
-                                $password = $_POST['password'];
-                                $errors = [];
-                                
-                                // Check length
-                                if (strlen($password) < 8) {
-                                    $errors[] = 'Password must be at least 8 characters long';
-                                }
-                                
-                                // Check for uppercase letters
-                                if (!preg_match('/[A-Z]/', $password)) {
-                                    $errors[] = 'Password must contain at least one uppercase letter';
-                                }
-                                
-                                // Check for lowercase letters
-                                if (!preg_match('/[a-z]/', $password)) {
-                                    $errors[] = 'Password must contain at least one lowercase letter';
-                                }
-                                
-                                // Check for numbers
-                                if (!preg_match('/[0-9]/', $password)) {
-                                    $errors[] = 'Password must contain at least one number';
-                                }
-                                
-                                // Check for special characters
-                                if (!preg_match('/[^A-Za-z0-9]/', $password)) {
-                                    $errors[] = 'Password must contain at least one special character';
-                                }
-                                
-                                // If there are errors, return them
-                                if (!empty($errors)) {
-                                    echo json_encode([
-                                        'status' => 'error',
-                                        'message' => implode('. ', $errors)
-                                    ]);
-                                    break;
-                                }
-                            
-                                try {
-                                    Config::updatePassword($_POST['username'], $password);
-                                    echo json_encode(['status' => 'success']);
-                                } catch (Exception $e) {
-                                    echo json_encode([
-                                        'status' => 'error',
-                                        'message' => $e->getMessage()
-                                    ]);
-                                }
-                                break;
-                    
-                    case 'delete_user':
-                        // Check if current user is admin
-                        if (!isset($_SESSION['username']) || $_SESSION['username'] !== 'admin') {
-                            echo json_encode([
-                                'status' => 'error',
-                                'message' => 'Access denied. Only admin can perform this action.'
-                            ]);
-                            break;
-                        }
-                        
-                        if (!isset($_POST['username'])) {
-                            echo json_encode([
-                                'status' => 'error',
-                                'message' => 'Missing username'
-                            ]);
-                            break;
-                        }
-                    
-                        try {
-                            Config::deleteUser($_POST['username']);
-                            echo json_encode(['status' => 'success']);
-                        } catch (Exception $e) {
-                            echo json_encode([
-                                'status' => 'error',
-                                'message' => $e->getMessage()
-                            ]);
-                        }
-                        break;
+            case 'get_users':
+                // Check if current user is admin
+                if (!isset($_SESSION['username']) || $_SESSION['username'] !== 'admin') {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Access denied. Only admin can perform this action.'
+                    ]);
+                    break;
+                }
+                
+                try {
+                    $users = Config::getUsers();
+                    $userList = [];
+                    foreach ($users as $username => $hash) {
+                        $userList[] = ['username' => $username];
+                    }
+                    echo json_encode([
+                        'status' => 'success',
+                        'users' => $userList
+                    ]);
+                } catch (Exception $e) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => $e->getMessage()
+                    ]);
+                }
+                break;
+            
+            case 'add_user':
+                // Check if current user is admin
+                if (!isset($_SESSION['username']) || $_SESSION['username'] !== 'admin') {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Access denied. Only admin can perform this action.'
+                    ]);
+                    break;
+                }
+                
+                if (!isset($_POST['username']) || !isset($_POST['password'])) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Missing required parameters'
+                    ]);
+                    break;
+                }
+            
+                // Enhanced password validation
+                $password = $_POST['password'];
+                $errors = [];
+                
+                // Check length
+                if (strlen($password) < 8) {
+                    $errors[] = 'Password must be at least 8 characters long';
+                }
+                
+                // Check for uppercase letters
+                if (!preg_match('/[A-Z]/', $password)) {
+                    $errors[] = 'Password must contain at least one uppercase letter';
+                }
+                
+                // Check for lowercase letters
+                if (!preg_match('/[a-z]/', $password)) {
+                    $errors[] = 'Password must contain at least one lowercase letter';
+                }
+                
+                // Check for numbers
+                if (!preg_match('/[0-9]/', $password)) {
+                    $errors[] = 'Password must contain at least one number';
+                }
+                
+                // Check for special characters
+                if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+                    $errors[] = 'Password must contain at least one special character';
+                }
+                
+                // If there are errors, return them
+                if (!empty($errors)) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => implode('. ', $errors)
+                    ]);
+                    break;
+                }
+            
+                try {
+                    Config::addUser($_POST['username'], $password);
+                    echo json_encode(['status' => 'success']);
+                } catch (Exception $e) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => $e->getMessage()
+                    ]);
+                }
+                break;
+        
+            case 'change_password':
+                // Admin can change any password, other users can only change their own
+                if (!isset($_SESSION['username']) || 
+                    ($_SESSION['username'] !== 'admin' && $_SESSION['username'] !== $_POST['username'])) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Access denied. You can only change your own password.'
+                    ]);
+                    break;
+                }
+                
+                if (!isset($_POST['username']) || !isset($_POST['password'])) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Missing required parameters'
+                    ]);
+                    break;
+                }
+            
+                // Enhanced password validation
+                $password = $_POST['password'];
+                $errors = [];
+                
+                // Check length
+                if (strlen($password) < 8) {
+                    $errors[] = 'Password must be at least 8 characters long';
+                }
+                
+                // Check for uppercase letters
+                if (!preg_match('/[A-Z]/', $password)) {
+                    $errors[] = 'Password must contain at least one uppercase letter';
+                }
+                
+                // Check for lowercase letters
+                if (!preg_match('/[a-z]/', $password)) {
+                    $errors[] = 'Password must contain at least one lowercase letter';
+                }
+                
+                // Check for numbers
+                if (!preg_match('/[0-9]/', $password)) {
+                    $errors[] = 'Password must contain at least one number';
+                }
+                
+                // Check for special characters
+                if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+                    $errors[] = 'Password must contain at least one special character';
+                }
+                
+                // If there are errors, return them
+                if (!empty($errors)) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => implode('. ', $errors)
+                    ]);
+                    break;
+                }
+            
+                try {
+                    Config::updatePassword($_POST['username'], $password);
+                    echo json_encode(['status' => 'success']);
+                } catch (Exception $e) {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => $e->getMessage()
+                    ]);
+                }
+                break;
+        
+            case 'delete_user':
+                // Check if current user is admin
+                if (!isset($_SESSION['username']) || $_SESSION['username'] !== 'admin') {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Access denied. Only admin can perform this action.'
+                    ]);
+                    break;
+                }
+                
                 if (!isset($_POST['username'])) {
                     echo json_encode([
                         'status' => 'error',
@@ -781,7 +725,7 @@ if (isset($_GET['action'])) {
                     ]);
                     break;
                 }
-
+            
                 try {
                     Config::deleteUser($_POST['username']);
                     echo json_encode(['status' => 'success']);
@@ -806,7 +750,6 @@ if (isset($_GET['action'])) {
                 break;
         }
     } catch (Exception $e) {
-        debugLog('Action error', $e->getMessage());
         echo json_encode([
             'status' => 'error',
             'message' => $e->getMessage()
@@ -819,7 +762,6 @@ if (isset($_GET['action'])) {
 if (isset($_GET['view']) && isset($_SESSION['authenticated'])) {
     try {
         $file = sanitizePath($_GET['view']);
-        debugLog('View file request', $file);
         
         if ($file && file_exists($file) && !is_dir($file) && is_readable($file)) {
             try {
@@ -830,7 +772,6 @@ if (isset($_GET['view']) && isset($_SESSION['authenticated'])) {
                 readfile($file);
                 exit;
             } catch (Exception $e) {
-                debugLog('View file error', $e->getMessage());
                 header('HTTP/1.1 500 Internal Server Error');
                 exit;
             }
@@ -838,7 +779,6 @@ if (isset($_GET['view']) && isset($_SESSION['authenticated'])) {
         header('HTTP/1.1 404 Not Found');
         exit;
     } catch (Exception $e) {
-        debugLog('View file error', $e->getMessage());
         header('HTTP/1.1 500 Internal Server Error');
         exit;
     }
